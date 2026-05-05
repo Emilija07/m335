@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "quicksplit",
+    "name": "QuickSplit",
     "slug": "quicksplit",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,6 +10,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
+    },
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
     },
     "android": {
       "adaptiveIcon": {
