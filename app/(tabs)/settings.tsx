@@ -1,21 +1,58 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+const translations = {
+  de: {
+    settings: "Einstellungen",
+    customize: "App anpassen",
+    subtitle: "Passe Darstellung und Sprache von QuickSplit an.",
+    design: "Design",
+    light: "Hell",
+    dark: "Dunkel",
+    language: "Sprache",
+    german: "Deutsch",
+    english: "English",
+    features: "Weitere mögliche Features",
+    featureList:
+      "• Währung auswählen: CHF, EUR, USD\n• Daten zurücksetzen\n• Export als PDF oder Screenshot\n• Standard-Sprache speichern\n• App-Version anzeigen",
+  },
+  en: {
+    settings: "Settings",
+    customize: "Customize app",
+    subtitle: "Customize the appearance and language of QuickSplit.",
+    design: "Design",
+    light: "Light",
+    dark: "Dark",
+    language: "Language",
+    german: "German",
+    english: "English",
+    features: "Possible future features",
+    featureList:
+      "• Select currency: CHF, EUR, USD\n• Reset data\n• Export as PDF or screenshot\n• Save default language\n• Show app version",
+  },
+};
 
 export default function SettingsScreen() {
   const [theme, setTheme] = useState("light");
-  const [language, setLanguage] = useState("de");
+  const [language, setLanguage] = useState<"de" | "en">("de");
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadSettings();
+    }, [])
+  );
 
   async function loadSettings() {
     const savedTheme = await AsyncStorage.getItem("theme");
     const savedLanguage = await AsyncStorage.getItem("language");
 
     if (savedTheme) setTheme(savedTheme);
-    if (savedLanguage) setLanguage(savedLanguage);
+
+    if (savedLanguage === "de" || savedLanguage === "en") {
+      setLanguage(savedLanguage);
+    }
   }
 
   async function changeTheme(value: string) {
@@ -23,30 +60,31 @@ export default function SettingsScreen() {
     await AsyncStorage.setItem("theme", value);
   }
 
-  async function changeLanguage(value: string) {
+  async function changeLanguage(value: "de" | "en") {
     setLanguage(value);
     await AsyncStorage.setItem("language", value);
   }
 
   const isDark = theme === "dark";
+  const t = translations[language];
 
   return (
     <View style={[styles.container, isDark && styles.darkContainer]}>
       <Text style={[styles.pageLabel, isDark && styles.darkGreenText]}>
-        Einstellungen
+        {t.settings}
       </Text>
 
       <Text style={[styles.title, isDark && styles.darkTitle]}>
-        App anpassen
+        {t.customize}
       </Text>
 
       <Text style={[styles.subtitle, isDark && styles.darkSubtitle]}>
-        Passe Darstellung und Sprache von QuickSplit an.
+        {t.subtitle}
       </Text>
 
       <View style={[styles.card, isDark && styles.darkCard]}>
         <Text style={[styles.cardTitle, isDark && styles.darkTitle]}>
-          Design
+          {t.design}
         </Text>
 
         <View style={styles.optionRow}>
@@ -63,7 +101,7 @@ export default function SettingsScreen() {
                 theme === "light" && styles.optionTextActive,
               ]}
             >
-              Hell
+              {t.light}
             </Text>
           </TouchableOpacity>
 
@@ -80,7 +118,7 @@ export default function SettingsScreen() {
                 theme === "dark" && styles.optionTextActive,
               ]}
             >
-              Dunkel
+              {t.dark}
             </Text>
           </TouchableOpacity>
         </View>
@@ -88,7 +126,7 @@ export default function SettingsScreen() {
 
       <View style={[styles.card, isDark && styles.darkCard]}>
         <Text style={[styles.cardTitle, isDark && styles.darkTitle]}>
-          Sprache
+          {t.language}
         </Text>
 
         <View style={styles.optionRow}>
@@ -105,7 +143,7 @@ export default function SettingsScreen() {
                 language === "de" && styles.optionTextActive,
               ]}
             >
-              Deutsch
+              {t.german}
             </Text>
           </TouchableOpacity>
 
@@ -122,7 +160,7 @@ export default function SettingsScreen() {
                 language === "en" && styles.optionTextActive,
               ]}
             >
-              English
+              {t.english}
             </Text>
           </TouchableOpacity>
         </View>
@@ -130,15 +168,11 @@ export default function SettingsScreen() {
 
       <View style={[styles.infoCard, isDark && styles.darkInfoCard]}>
         <Text style={[styles.infoTitle, isDark && styles.darkTitle]}>
-          Weitere mögliche Features
+          {t.features}
         </Text>
 
         <Text style={[styles.infoText, isDark && styles.darkSubtitle]}>
-          • Währung auswählen: CHF, EUR, USD{"\n"}
-          • Daten zurücksetzen{"\n"}
-          • Export als PDF oder Screenshot{"\n"}
-          • Standard-Sprache speichern{"\n"}
-          • App-Version anzeigen
+          {t.featureList}
         </Text>
       </View>
     </View>
