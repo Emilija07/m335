@@ -1,0 +1,44 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#16A34A"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="card" x1="272" y1="214" x2="752" y2="742" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E8F5E9"/>
+    </linearGradient>
+    <filter id="shadow" x="190" y="150" width="644" height="644" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="26" stdDeviation="34" flood-color="#020617" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+
+  <circle cx="204" cy="190" r="68" fill="#FFFFFF" opacity="0.08"/>
+  <circle cx="838" cy="816" r="96" fill="#FFFFFF" opacity="0.07"/>
+  <circle cx="810" cy="214" r="34" fill="#FFFFFF" opacity="0.10"/>
+
+  <g filter="url(#shadow)">
+    <rect x="272" y="214" width="480" height="480" rx="120" fill="url(#card)"/>
+  </g>
+
+  <!-- split arrows -->
+  <path d="M364 512H660" stroke="#15803D" stroke-width="46" stroke-linecap="round"/>
+  <path d="M616 438L690 512L616 586" stroke="#15803D" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M408 438L334 512L408 586" stroke="#15803D" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- money bill -->
+  <rect x="394" y="378" width="236" height="268" rx="42" fill="#22C55E"/>
+  <rect x="425" y="414" width="174" height="196" rx="28" fill="#DCFCE7" opacity="0.95"/>
+  <circle cx="512" cy="512" r="55" fill="#16A34A"/>
+  <text x="512" y="535" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="68" font-weight="800" fill="#FFFFFF">₣</text>
+
+  <!-- small people dots -->
+  <circle cx="370" cy="330" r="28" fill="#F59E0B"/>
+  <circle cx="654" cy="330" r="28" fill="#3B82F6"/>
+  <circle cx="512" cy="700" r="28" fill="#22C55E"/>
+
+  <text x="512" y="825" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="78" font-weight="800" fill="#FFFFFF">QuickSplit</text>
+  <text x="512" y="884" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="500" fill="#DCFCE7">Kosten einfach teilen</text>
+</svg>
