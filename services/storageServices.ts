@@ -5,7 +5,9 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   setDoc,
+  where,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
@@ -22,103 +24,176 @@ export type Group = {
   name: string;
   persons: string[];
   expenses: Expense[];
+
+  // Neue Felder für geteilte Gruppen
+  members?: string[];        // User-IDs
+  memberUsernames?: string[]; // Usernames
+  ownerId?: string;
 };
 
 const LOCAL_KEY = "guest_groups";
 
-function normalizeGroup(data: any): Group {
-  return {
-    id: String(data.id),
-    name: String(data.name ?? "Gruppe"),
-    persons: Array.isArray(data.persons) ? data.persons : [],
-    expenses: Array.isArray(data.expenses) ? data.expenses : [],
-  };
-}
-
-async function loadLegacyGuestGroups(): Promise<Group[]> {
-  const legacyData = await AsyncStorage.getItem("groups");
-  if (!legacyData) return [];
-
-  const legacyGroups = JSON.parse(legacyData);
-
-  const migratedGroups = await Promise.all(
-    legacyGroups.map(async (group: any) => {
-      const savedPeople = await AsyncStorage.getItem(`people_${group.id}`);
-      const savedExpenses = await AsyncStorage.getItem(`expenses_${group.id}`);
-
-      return normalizeGroup({
-        ...group,
-        persons: savedPeople ? JSON.parse(savedPeople) : [],
-        expenses: savedExpenses ? JSON.parse(savedExpenses) : [],
-      });
-    })
-  );
-
-  await AsyncStorage.setItem(LOCAL_KEY, JSON.stringify(migratedGroups));
-  return migratedGroups;
-}
-
+/**
+ * Lädt alle Gruppen:
+ * - Eingeloggt: eigene Gruppen + Gruppen, in denen der Benutzer Mitglied ist
+ * - Guest: lokal
+ */
 export async function loadGroups(): Promise<Group[]> {
   const user = auth.currentUser;
 
-  if (user) {
-    const snapshot = await getDocs(collection(db, "users", user.uid, "groups"));
-    return snapshot.docs.map((document) =>
-      normalizeGroup({ id: document.id, ...document.data() })
-    );
+  if (!user) {
+    const data = await AsyncStorage.getItem(LOCAL_KEY);
+    return data ? JSON.parse(data) : [];
   }
 
-  const data = await AsyncStorage.getItem(LOCAL_KEY);
-  if (data) return JSON.parse(data).map(normalizeGroup);
+  const groupsMap = new Map<string, Group>();
 
-  return await loadLegacyGuestGroups();
+  // Eigene Gruppen laden
+  const ownSnapshot = await getDocs(
+    collection(db, "users", user.uid, "groups")
+  );
+
+  ownSnapshot.docs.forEach((document) => {
+    const group = document.data() as Group;
+    groupsMap.set(group.id, group);
+  });
+
+  // Gruppen laden, in denen der Benutzer Mitglied ist
+  const sharedQuery = query(
+    collection(db, "sharedGroups"),
+    where("members", "array-contains", user.uid)
+  );
+
+  const sharedSnapshot = await getDocs(sharedQuery);
+
+  sharedSnapshot.docs.forEach((document) => {
+    const group = document.data() as Group;
+    groupsMap.set(group.id, group);
+  });
+
+  return Array.from(groupsMap.values());
 }
 
-export async function loadGroup(groupId: string): Promise<Group | null> {
-  const user = auth.currentUser;
-
-  if (user) {
-    const groupRef = doc(db, "users", user.uid, "groups", groupId);
-    const snapshot = await getDoc(groupRef);
-
-    if (!snapshot.exists()) return null;
-
-    return normalizeGroup({ id: snapshot.id, ...snapshot.data() });
-  }
-
-  const groups = await loadGroups();
-  return groups.find((group) => group.id === groupId) ?? null;
-}
-
+/**
+ * Speichert eine Gruppe
+ */
 export async function saveGroup(group: Group) {
   const user = auth.currentUser;
-  const normalizedGroup = normalizeGroup(group);
 
-  if (user) {
-    await setDoc(
-      doc(db, "users", user.uid, "groups", normalizedGroup.id),
-      normalizedGroup
-    );
+  if (!user) {
+    const groups = await loadGroups();
+    const updated = groups.filter((g) => g.id !== group.id);
+    updated.push(group);
+
+    await AsyncStorage.setItem(LOCAL_KEY, JSON.stringify(updated));
     return;
   }
 
-  const groups = await loadGroups();
-  const updatedGroups = groups.filter((item) => item.id !== normalizedGroup.id);
-  updatedGroups.push(normalizedGroup);
+  const groupToSave: Group = {
+    ...group,
+    ownerId: user.uid,
+    members: group.members ?? [user.uid],
+    memberUsernames: group.memberUsernames ?? [
+      user.displayName || "unknown",
+    ],
+  };
 
-  await AsyncStorage.setItem(LOCAL_KEY, JSON.stringify(updatedGroups));
+  // In eigener Collection speichern
+  await setDoc(
+    doc(db, "users", user.uid, "groups", group.id),
+    groupToSave
+  );
+
+  // In sharedGroups speichern, damit andere Mitglieder sie sehen
+  await setDoc(
+    doc(db, "sharedGroups", group.id),
+    groupToSave
+  );
 }
 
+/**
+ * Einzelne Gruppe laden
+ */
+export async function loadGroup(groupId: string): Promise<Group | null> {
+  const groups = await loadGroups();
+  return groups.find((group) => group.id === groupId) || null;
+}
+
+/**
+ * Gruppe löschen
+ */
 export async function deleteGroup(groupId: string) {
   const user = auth.currentUser;
 
-  if (user) {
-    await deleteDoc(doc(db, "users", user.uid, "groups", groupId));
+  if (!user) {
+    const groups = await loadGroups();
+    const updated = groups.filter((g) => g.id !== groupId);
+
+    await AsyncStorage.setItem(LOCAL_KEY, JSON.stringify(updated));
     return;
   }
 
-  const groups = await loadGroups();
-  const updatedGroups = groups.filter((group) => group.id !== groupId);
+  // Eigene Gruppe löschen
+  await deleteDoc(doc(db, "users", user.uid, "groups", groupId));
 
-  await AsyncStorage.setItem(LOCAL_KEY, JSON.stringify(updatedGroups));
+  // Shared-Gruppe löschen
+  await deleteDoc(doc(db, "sharedGroups", groupId));
+}
+
+/**
+ * Benutzer anhand des Usernames zur Gruppe hinzufügen
+ */
+export async function addUserToGroup(
+  groupId: string,
+  username: string
+): Promise<boolean> {
+  const cleanUsername = username.trim().toLowerCase();
+
+  if (!cleanUsername) {
+    return false;
+  }
+
+  // Username in Firestore suchen
+  const usernameDoc = await getDoc(
+    doc(db, "usernames", cleanUsername)
+  );
+
+  if (!usernameDoc.exists()) {
+    return false;
+  }
+
+  const { uid } = usernameDoc.data() as { uid: string };
+
+  // Gruppe laden
+  const group = await loadGroup(groupId);
+
+  if (!group) {
+    return false;
+  }
+
+  const members = group.members ?? [];
+  const memberUsernames = group.memberUsernames ?? [];
+
+  // Bereits Mitglied?
+  if (members.includes(uid)) {
+    return true;
+  }
+
+  // Mitglied hinzufügen
+  const updatedGroup: Group = {
+    ...group,
+    members: [...members, uid],
+    memberUsernames: [...memberUsernames, cleanUsername],
+  };
+
+  // Gruppe erneut speichern
+  await saveGroup(updatedGroup);
+
+  // Kopie auch beim eingeladenen Benutzer speichern
+  await setDoc(
+    doc(db, "users", uid, "groups", groupId),
+    updatedGroup
+  );
+
+  return true;
 }
