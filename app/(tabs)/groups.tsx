@@ -1,4 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  deleteGroup as deleteStoredGroup,
+  Group,
+  loadGroups as loadStoredGroups,
+  saveGroup,
+} from "../../services/storageServices";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -11,10 +17,6 @@ import {
     View,
 } from "react-native";
 
-type Group = {
-  id: string;
-  name: string;
-};
 
 const translations = {
   de: {
@@ -55,10 +57,6 @@ export default function GroupsScreen() {
     loadGroups();
   }, []);
 
-  useEffect(() => {
-    saveGroups();
-  }, [groups]);
-
   useFocusEffect(
     useCallback(() => {
       loadSettings();
@@ -77,15 +75,11 @@ export default function GroupsScreen() {
   }
 
   async function loadGroups() {
-    const savedGroups = await AsyncStorage.getItem("groups");
-    if (savedGroups) setGroups(JSON.parse(savedGroups));
+    const data = await loadStoredGroups();
+    setGroups(data);
   }
 
-  async function saveGroups() {
-    await AsyncStorage.setItem("groups", JSON.stringify(groups));
-  }
-
-  function addGroup() {
+  async function addGroup() {
     const name = groupName.trim();
 
     if (!name) {
@@ -96,14 +90,18 @@ export default function GroupsScreen() {
     const newGroup: Group = {
       id: Date.now().toString(),
       name,
+      persons: [],
+      expenses: [],
     };
 
-    setGroups([...groups, newGroup]);
+    await saveGroup(newGroup);
+    await loadGroups();
     setGroupName("");
   }
 
-  function deleteGroup(id: string) {
-    setGroups(groups.filter((group) => group.id !== id));
+  async function deleteGroup(id: string) {
+    await deleteStoredGroup(id);
+    await loadGroups();
   }
 
   const isDark = theme === "dark";

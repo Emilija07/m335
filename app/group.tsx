@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { loadGroup, saveGroup } from "../services/storageServices";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -107,6 +108,7 @@ export default function GroupScreen() {
   const [paidBy, setPaidBy] = useState("");
   const [shares, setShares] = useState<Record<string, string>>({});
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -115,14 +117,15 @@ export default function GroupScreen() {
   );
 
   useEffect(() => {
+    setDataLoaded(false);
     loadData();
   }, [groupId]);
 
   useEffect(() => {
-    if (groupId && (people.length > 0 || expenses.length > 0)) {
+    if (groupId && dataLoaded) {
       saveData();
     }
-  }, [people, expenses, groupId]);
+  }, [people, expenses, groupId, dataLoaded]);
 
   async function loadTheme() {
     const savedTheme = await AsyncStorage.getItem("theme");
@@ -137,30 +140,35 @@ export default function GroupScreen() {
 
   async function loadData() {
     try {
-      const savedPeople = await AsyncStorage.getItem(`people_${groupId}`);
-      const savedExpenses = await AsyncStorage.getItem(`expenses_${groupId}`);
+      const group = await loadGroup(groupId);
 
-      if (savedPeople) {
-        const parsedPeople = JSON.parse(savedPeople);
-        setPeople(parsedPeople);
-
-        if (parsedPeople.length > 0) {
-          setPaidBy(parsedPeople[0]);
-        }
+      if (!group) {
+        setDataLoaded(true);
+        return;
       }
 
-      if (savedExpenses) {
-        setExpenses(JSON.parse(savedExpenses));
+      setPeople(group.persons);
+      setExpenses(group.expenses);
+
+      if (group.persons.length > 0) {
+        setPaidBy(group.persons[0]);
       }
+
+      setDataLoaded(true);
     } catch (error) {
       console.log("Fehler beim Laden:", error);
+      setDataLoaded(true);
     }
   }
 
   async function saveData() {
     try {
-      await AsyncStorage.setItem(`people_${groupId}`, JSON.stringify(people));
-      await AsyncStorage.setItem(`expenses_${groupId}`, JSON.stringify(expenses));
+      await saveGroup({
+        id: groupId,
+        name: groupName,
+        persons: people,
+        expenses,
+      });
     } catch (error) {
       console.log("Fehler beim Speichern:", error);
     }
@@ -306,8 +314,13 @@ export default function GroupScreen() {
     setExpenses([]);
     setPaidBy("");
     setShares({});
-    await AsyncStorage.removeItem(`people_${groupId}`);
-    await AsyncStorage.removeItem(`expenses_${groupId}`);
+
+    await saveGroup({
+      id: groupId,
+      name: groupName,
+      persons: [],
+      expenses: [],
+    });
   }
 
   function openResult() {

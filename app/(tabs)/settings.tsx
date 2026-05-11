@@ -2,6 +2,18 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { signOut } from "firebase/auth";
+import { router } from "expo-router";
+import { auth } from "../../firebase";
+import { translation } from "../../constants/translation";
+
+const language = "de"; // oder "en"
+const t = translation[language as "de" | "en"];
+
+const handleLogout = async () => {
+  await signOut(auth);
+  router.replace("/login");
+};
 
 const translations = {
   de: {
@@ -166,6 +178,15 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      <View style={styles.logoutContainer}>
+  <TouchableOpacity
+    style={styles.logoutButton}
+    onPress={handleLogout}
+  >
+    <Text style={styles.logoutText}>Ausloggen</Text>
+  </TouchableOpacity>
+</View>
+
       <View style={[styles.infoCard, isDark && styles.darkInfoCard]}>
         <Text style={[styles.infoTitle, isDark && styles.darkTitle]}>
           {t.features}
@@ -278,4 +299,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
+logoutContainer: {
+  marginTop: 30,
+  paddingHorizontal: 20,
+},
+logoutButton: {
+  backgroundColor: "#D9534F",
+  paddingVertical: 14,
+  borderRadius: 12,
+  alignItems: "center",
+},
+logoutText: {
+  color: "#FFFFFF",
+  fontSize: 16,
+  fontWeight: "bold",
+},
 });
