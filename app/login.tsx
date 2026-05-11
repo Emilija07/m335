@@ -19,7 +19,8 @@ import {
 } from "react-native";
 
 import { translation } from "../constants/translation";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 export default function LoginScreen() {
   const [theme, setTheme] = useState("light");
@@ -29,6 +30,7 @@ export default function LoginScreen() {
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -118,6 +120,7 @@ export default function LoginScreen() {
     const cleanEmail = email.trim().toLowerCase();
     const cleanFirstName = firstName.trim();
     const cleanLastName = lastName.trim();
+    const cleanUsername = username.trim().toLowerCase();
 
     if (!cleanEmail || !password) {
       Alert.alert(
@@ -139,6 +142,16 @@ export default function LoginScreen() {
       return;
     }
 
+    if (isRegister && !cleanUsername) {
+      Alert.alert(
+        language === "de" ? "Fehler" : "Error",
+        language === "de"
+          ? "Bitte Benutzernamen eingeben."
+          : "Please enter a username."
+      );
+      return;
+    }
+
     if (password.length < 6) {
       Alert.alert(
         language === "de" ? "Fehler" : "Error",
@@ -153,6 +166,20 @@ export default function LoginScreen() {
       setButtonLoading(true);
 
       if (isRegister) {
+
+        const usernameRef = doc(db, "usernames", cleanUsername);
+const usernameSnapshot = await getDoc(usernameRef);
+
+if (usernameSnapshot.exists()) {
+  Alert.alert(
+    language === "de" ? "Fehler" : "Error",
+    language === "de"
+      ? "Dieser Benutzername ist bereits vergeben."
+      : "This username is already taken."
+  );
+  setButtonLoading(false);
+  return;
+}
         const userCredential = await createUserWithEmailAndPassword(
           auth,
           cleanEmail,
@@ -160,8 +187,16 @@ export default function LoginScreen() {
         );
 
         await updateProfile(userCredential.user, {
-          displayName: `${cleanFirstName} ${cleanLastName}`,
+          displayName: cleanUsername,
         });
+
+        await setDoc(doc(db, "usernames", cleanUsername), {
+  uid: userCredential.user.uid,
+  username: cleanUsername,
+  firstName: cleanFirstName,
+  lastName: cleanLastName,
+  email: cleanEmail,
+});
 
         Alert.alert(
           language === "de"
@@ -232,6 +267,15 @@ export default function LoginScreen() {
               placeholderTextColor="#94A3B8"
               value={lastName}
               onChangeText={setLastName}
+            />
+
+            <TextInput
+              style={[styles.input, isDark && styles.darkInput]}
+              placeholder="Benutzername"
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="none"
+              value={username}
+              onChangeText={setUsername}
             />
           </>
         )}
