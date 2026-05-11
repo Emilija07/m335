@@ -26,7 +26,7 @@ export type Group = {
   expenses: Expense[];
 
   // Neue Felder für geteilte Gruppen
-  members?: string[];        // User-IDs
+  members?: string[]; // User-IDs
   memberUsernames?: string[]; // Usernames
   ownerId?: string;
 };
@@ -50,7 +50,7 @@ export async function loadGroups(): Promise<Group[]> {
 
   // Eigene Gruppen laden
   const ownSnapshot = await getDocs(
-    collection(db, "users", user.uid, "groups")
+    collection(db, "users", user.uid, "groups"),
   );
 
   ownSnapshot.docs.forEach((document) => {
@@ -61,7 +61,7 @@ export async function loadGroups(): Promise<Group[]> {
   // Gruppen laden, in denen der Benutzer Mitglied ist
   const sharedQuery = query(
     collection(db, "sharedGroups"),
-    where("members", "array-contains", user.uid)
+    where("members", "array-contains", user.uid),
   );
 
   const sharedSnapshot = await getDocs(sharedQuery);
@@ -93,22 +93,14 @@ export async function saveGroup(group: Group) {
     ...group,
     ownerId: user.uid,
     members: group.members ?? [user.uid],
-    memberUsernames: group.memberUsernames ?? [
-      user.displayName || "unknown",
-    ],
+    memberUsernames: group.memberUsernames ?? [user.displayName || "unknown"],
   };
 
   // In eigener Collection speichern
-  await setDoc(
-    doc(db, "users", user.uid, "groups", group.id),
-    groupToSave
-  );
+  await setDoc(doc(db, "users", user.uid, "groups", group.id), groupToSave);
 
   // In sharedGroups speichern, damit andere Mitglieder sie sehen
-  await setDoc(
-    doc(db, "sharedGroups", group.id),
-    groupToSave
-  );
+  await setDoc(doc(db, "sharedGroups", group.id), groupToSave);
 }
 
 /**
@@ -145,7 +137,7 @@ export async function deleteGroup(groupId: string) {
  */
 export async function addUserToGroup(
   groupId: string,
-  username: string
+  username: string,
 ): Promise<boolean> {
   const cleanUsername = username.trim().toLowerCase();
 
@@ -154,9 +146,7 @@ export async function addUserToGroup(
   }
 
   // Username in Firestore suchen
-  const usernameDoc = await getDoc(
-    doc(db, "usernames", cleanUsername)
-  );
+  const usernameDoc = await getDoc(doc(db, "usernames", cleanUsername));
 
   if (!usernameDoc.exists()) {
     return false;
@@ -182,6 +172,9 @@ export async function addUserToGroup(
   // Mitglied hinzufügen
   const updatedGroup: Group = {
     ...group,
+    persons: group.persons.includes(cleanUsername)
+      ? group.persons
+      : [...group.persons, cleanUsername],
     members: [...members, uid],
     memberUsernames: [...memberUsernames, cleanUsername],
   };
@@ -190,10 +183,7 @@ export async function addUserToGroup(
   await saveGroup(updatedGroup);
 
   // Kopie auch beim eingeladenen Benutzer speichern
-  await setDoc(
-    doc(db, "users", uid, "groups", groupId),
-    updatedGroup
-  );
+  await setDoc(doc(db, "users", uid, "groups", groupId), updatedGroup);
 
   return true;
 }

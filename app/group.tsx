@@ -1,5 +1,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import {
+  arrayUnion,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  updateDoc,
+  where,
+} from "firebase/firestore";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -11,7 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { loadGroup, saveGroup } from "../services/storageServices";
+import { db } from "../firebase";
 
 type Expense = {
   id: string;
@@ -53,7 +63,8 @@ const translations = {
     enterShares: "Bitte gib die Anteile der Personen ein.",
     sharesMustMatch: "Die Summe der Anteile muss",
     currently: "Aktuell sind es",
-    calculationNeedsPeople: "Für die Berechnung braucht es mindestens zwei Personen.",
+    calculationNeedsPeople:
+      "Für die Berechnung braucht es mindestens zwei Personen.",
     calculationNeedsExpense: "Bitte erfasse zuerst mindestens eine Ausgabe.",
   },
   en: {
@@ -87,7 +98,8 @@ const translations = {
     enterShares: "Please enter each person's shares.",
     sharesMustMatch: "The sum of shares must be",
     currently: "Currently it is",
-    calculationNeedsPeople: "At least two people are required for the calculation.",
+    calculationNeedsPeople:
+      "At least two people are required for the calculation.",
     calculationNeedsExpense: "Please add at least one expense first.",
   },
 };
@@ -114,7 +126,7 @@ export default function GroupScreen() {
   useFocusEffect(
     useCallback(() => {
       loadTheme();
-    }, [])
+    }, []),
   );
 
   useEffect(() => {
@@ -135,27 +147,31 @@ export default function GroupScreen() {
 
     if (savedTheme) setTheme(savedTheme);
 
-    if (savedCurrency) {setCurrency(savedCurrency);}
+    if (savedCurrency) {
+      setCurrency(savedCurrency);
+    }
 
     if (savedLanguage === "de" || savedLanguage === "en") {
-        setLanguage(savedLanguage);
+      setLanguage(savedLanguage);
     }
-    
-}
+  }
 
   async function loadData() {
     try {
-      const group = await loadGroup(groupId);
+      const groupRef = doc(db, "groups", groupId);
+      const snapshot = await getDoc(groupRef);
 
-      if (!group) {
+      if (!snapshot.exists()) {
         setDataLoaded(true);
         return;
       }
 
-      setPeople(group.persons);
-      setExpenses(group.expenses);
+      const group = snapshot.data();
 
-      if (group.persons.length > 0) {
+      setPeople(group.persons || []);
+      setExpenses(group.expenses || []);
+
+      if (group.persons && group.persons.length > 0) {
         setPaidBy(group.persons[0]);
       }
 
@@ -166,20 +182,19 @@ export default function GroupScreen() {
     }
   }
 
-  async function saveData() {
+  async function saveData(updatedPeople = people, updatedExpenses = expenses) {
     try {
-      await saveGroup({
-        id: groupId,
-        name: groupName,
-        persons: people,
-        expenses,
+      const groupRef = doc(db, "groups", groupId);
+
+      await updateDoc(groupRef, {
+        persons: updatedPeople,
+        expenses: updatedExpenses,
       });
     } catch (error) {
       console.log("Fehler beim Speichern:", error);
     }
   }
-
-  function addPerson() {
+  async function addPerson() {
     const name = personName.trim();
 
     if (!name) {
@@ -193,7 +208,34 @@ export default function GroupScreen() {
     }
 
     const updatedPeople = [...people, name];
+
     setPeople(updatedPeople);
+
+    try {
+      const usersQuery = query(
+        collection(db, "usernames"),
+        where("username", "==", name),
+      );
+
+      const usersSnapshot = await getDocs(usersQuery);
+
+      if (!usersSnapshot.empty) {
+        const invitedUserId = usersSnapshot.docs[0].data().uid;
+
+        await updateDoc(doc(db, "groups", groupId), {
+          persons: updatedPeople,
+          members: arrayUnion(invitedUserId),
+        });
+      } else {
+        await updateDoc(doc(db, "groups", groupId), {
+          persons: updatedPeople,
+        });
+      }
+    } catch (error) {
+      console.log("Fehler beim Hinzufügen:", error);
+      Alert.alert("Fehler", "Person konnte nicht gespeichert werden.");
+      return;
+    }
 
     if (!paidBy) setPaidBy(name);
 
@@ -207,7 +249,9 @@ export default function GroupScreen() {
 
   function deletePerson(name: string) {
     const updatedPeople = people.filter((person) => person !== name);
-    const updatedExpenses = expenses.filter((expense) => expense.paidBy !== name);
+    const updatedExpenses = expenses.filter(
+      (expense) => expense.paidBy !== name,
+    );
 
     const updatedShares = { ...shares };
     delete updatedShares[name];
@@ -215,6 +259,8 @@ export default function GroupScreen() {
     setPeople(updatedPeople);
     setExpenses(updatedExpenses);
     setShares(updatedShares);
+
+    saveData(updatedPeople, updatedExpenses);
 
     if (paidBy === name) {
       setPaidBy(updatedPeople.length > 0 ? updatedPeople[0] : "");
@@ -286,7 +332,7 @@ export default function GroupScreen() {
     if (Math.abs(sharesTotal - amount) > 0.05) {
       Alert.alert(
         t.error,
-        `${t.sharesMustMatch} ${amount.toFixed(2)} {currency}. ${t.currently} ${sharesTotal.toFixed(2)} {currency}.`
+        `${t.sharesMustMatch} ${amount.toFixed(2)} ${currency}. ${t.currently} ${sharesTotal.toFixed(2)} ${currency}.`,
       );
       return;
     }
@@ -299,7 +345,6 @@ export default function GroupScreen() {
       shares: numericShares,
     };
 
-    setExpenses([...expenses, newExpense]);
     setExpenseTitle("");
     setExpenseAmount("");
 
@@ -308,10 +353,16 @@ export default function GroupScreen() {
       emptyShares[person] = "";
     });
     setShares(emptyShares);
+
+    const updatedExpenses = [...expenses, newExpense];
+    setExpenses(updatedExpenses);
+    saveData(people, updatedExpenses);
   }
 
   function deleteExpense(id: string) {
-    setExpenses(expenses.filter((expense) => expense.id !== id));
+    const updatedExpenses = expenses.filter((expense) => expense.id !== id);
+    setExpenses(updatedExpenses);
+    saveData(people, updatedExpenses);
   }
 
   async function resetAll() {
@@ -320,12 +371,7 @@ export default function GroupScreen() {
     setPaidBy("");
     setShares({});
 
-    await saveGroup({
-      id: groupId,
-      name: groupName,
-      persons: [],
-      expenses: [],
-    });
+    await saveData([], []);
   }
 
   function openResult() {
@@ -364,14 +410,19 @@ export default function GroupScreen() {
 
       <View style={[styles.headerCard, isDark && styles.darkCard]}>
         <Text style={styles.pageLabel}>{t.group}</Text>
-        <Text style={[styles.title, isDark && styles.darkTitle]}>{groupName}</Text>
+        <Text style={[styles.title, isDark && styles.darkTitle]}>
+          {groupName}
+        </Text>
         <Text style={[styles.subtitle, isDark && styles.darkSubtitle]}>
-          {people.length} Personen · {expenses.length} Ausgaben · {total.toFixed(2)} {currency}
+          {people.length} Personen · {expenses.length} Ausgaben ·{" "}
+          {total.toFixed(2)} {currency}
         </Text>
       </View>
 
       <View style={[styles.card, isDark && styles.darkCard]}>
-        <Text style={[styles.cardTitle, isDark && styles.darkTitle]}>{t.people}</Text>
+        <Text style={[styles.cardTitle, isDark && styles.darkTitle]}>
+          {t.people}
+        </Text>
 
         <View style={styles.inputRow}>
           <TextInput
@@ -434,13 +485,18 @@ export default function GroupScreen() {
           onChangeText={setExpenseAmount}
         />
 
-        <Text style={[styles.label, isDark && styles.darkSubtitle]}>{t.paidBy}</Text>
+        <Text style={[styles.label, isDark && styles.darkSubtitle]}>
+          {t.paidBy}
+        </Text>
 
         <View style={styles.chipContainer}>
           {people.map((person) => (
             <TouchableOpacity
               key={person}
-              style={[styles.payerChip, paidBy === person && styles.payerChipActive]}
+              style={[
+                styles.payerChip,
+                paidBy === person && styles.payerChipActive,
+              ]}
               onPress={() => setPaidBy(person)}
             >
               <Text
@@ -466,8 +522,13 @@ export default function GroupScreen() {
         </View>
 
         {people.map((person) => (
-          <View key={person} style={[styles.shareRow, isDark && styles.darkSoftRow]}>
-            <Text style={[styles.shareName, isDark && styles.darkTitle]}>{person}</Text>
+          <View
+            key={person}
+            style={[styles.shareRow, isDark && styles.darkSoftRow]}
+          >
+            <Text style={[styles.shareName, isDark && styles.darkTitle]}>
+              {person}
+            </Text>
 
             <TextInput
               style={[styles.shareInput, isDark && styles.darkInput]}
@@ -486,7 +547,9 @@ export default function GroupScreen() {
       </View>
 
       <View style={[styles.card, isDark && styles.darkCard]}>
-        <Text style={[styles.cardTitle, isDark && styles.darkTitle]}>{t.expenses}</Text>
+        <Text style={[styles.cardTitle, isDark && styles.darkTitle]}>
+          {t.expenses}
+        </Text>
 
         {expenses.length === 0 ? (
           <Text style={[styles.emptyText, isDark && styles.darkSubtitle]}>
@@ -504,11 +567,19 @@ export default function GroupScreen() {
                 </View>
 
                 <View style={styles.expenseInfo}>
-                  <Text style={[styles.expenseTitle, isDark && styles.darkTitle]}>
+                  <Text
+                    style={[styles.expenseTitle, isDark && styles.darkTitle]}
+                  >
                     {item.title}
                   </Text>
-                  <Text style={[styles.expenseSubtitle, isDark && styles.darkSubtitle]}>
-                    {item.amount.toFixed(2)} {currency} · {t.paidByShort} {item.paidBy}
+                  <Text
+                    style={[
+                      styles.expenseSubtitle,
+                      isDark && styles.darkSubtitle,
+                    ]}
+                  >
+                    {item.amount.toFixed(2)} {currency} · {t.paidByShort}{" "}
+                    {item.paidBy}
                   </Text>
                 </View>
 

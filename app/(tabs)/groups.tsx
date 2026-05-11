@@ -1,28 +1,39 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  deleteGroup as deleteStoredGroup,
-  Group,
-  loadGroups as loadStoredGroups,
-  saveGroup,
-} from "../../services/storageServices";
 import { router, useFocusEffect } from "expo-router";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
 import { useCallback, useEffect, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { auth, db } from "../../firebase";
 
+type Group = {
+  id: string;
+  name: string;
+  persons: string[];
+  expenses: any[];
+};
 
 const translations = {
   de: {
     overview: "Übersicht",
     title: "Deine Gruppen",
-    subtitle: "Erstelle eine Gruppe für Reisen, Ausflüge oder gemeinsame Ausgaben.",
+    subtitle:
+      "Erstelle eine Gruppe für Reisen, Ausflüge oder gemeinsame Ausgaben.",
     newGroup: "Neue Gruppe",
     placeholder: "z. B. Mallorca 26",
     allGroups: "Alle Gruppen",
@@ -60,7 +71,7 @@ export default function GroupsScreen() {
   useFocusEffect(
     useCallback(() => {
       loadSettings();
-    }, [])
+    }, []),
   );
 
   async function loadSettings() {
@@ -75,7 +86,27 @@ export default function GroupsScreen() {
   }
 
   async function loadGroups() {
-    const data = await loadStoredGroups();
+    const user = auth.currentUser;
+
+    if (!user) {
+      setGroups([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, "groups"),
+      where("members", "array-contains", user.uid),
+    );
+
+    const snapshot = await getDocs(q);
+
+    const data = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      name: docSnap.data().name,
+      persons: docSnap.data().persons || [],
+      expenses: docSnap.data().expenses || [],
+    }));
+
     setGroups(data);
   }
 
@@ -87,20 +118,26 @@ export default function GroupsScreen() {
       return;
     }
 
-    const newGroup: Group = {
-      id: Date.now().toString(),
+    const user = auth.currentUser;
+
+    if (!user) {
+      Alert.alert("Fehler", "Du musst angemeldet sein.");
+      return;
+    }
+
+    await addDoc(collection(db, "groups"), {
       name,
+      members: [user.uid],
       persons: [],
       expenses: [],
-    };
+    });
 
-    await saveGroup(newGroup);
     await loadGroups();
     setGroupName("");
   }
 
   async function deleteGroup(id: string) {
-    await deleteStoredGroup(id);
+    await deleteDoc(doc(db, "groups", id));
     await loadGroups();
   }
 
@@ -113,9 +150,7 @@ export default function GroupsScreen() {
         {t.overview}
       </Text>
 
-      <Text style={[styles.title, isDark && styles.darkTitle]}>
-        {t.title}
-      </Text>
+      <Text style={[styles.title, isDark && styles.darkTitle]}>{t.title}</Text>
 
       <Text style={[styles.subtitle, isDark && styles.darkSubtitle]}>
         {t.subtitle}
@@ -185,7 +220,9 @@ export default function GroupsScreen() {
               <Text style={[styles.groupTitle, isDark && styles.darkTitle]}>
                 {item.name}
               </Text>
-              <Text style={[styles.groupSubtitle, isDark && styles.darkSubtitle]}>
+              <Text
+                style={[styles.groupSubtitle, isDark && styles.darkSubtitle]}
+              >
                 {t.openGroup}
               </Text>
             </View>
