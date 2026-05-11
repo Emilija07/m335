@@ -100,12 +100,19 @@ export default function GroupsScreen() {
 
     const snapshot = await getDocs(q);
 
-    const data = snapshot.docs.map((docSnap) => ({
-      id: docSnap.id,
-      name: docSnap.data().name,
-      persons: docSnap.data().persons || [],
-      expenses: docSnap.data().expenses || [],
-    }));
+    const data = snapshot.docs.map((docSnap) => {
+      const item = docSnap.data();
+
+      return {
+        id: docSnap.id,
+        name: item.name,
+        persons: item.persons || [],
+        expenses: item.expenses || [],
+        members: item.members || [],
+        memberUsernames: item.memberUsernames || [],
+        ownerId: item.ownerId,
+      };
+    });
 
     setGroups(data);
   }

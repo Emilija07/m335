@@ -2,13 +2,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   arrayUnion,
-  collection,
   doc,
   getDoc,
-  getDocs,
-  query,
-  updateDoc,
-  where,
+  updateDoc
 } from "firebase/firestore";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -195,56 +191,52 @@ export default function GroupScreen() {
     }
   }
   async function addPerson() {
-    const name = personName.trim();
+    const cleanUsername = personName.trim().toLowerCase();
 
-    if (!name) {
+    if (!cleanUsername) {
       Alert.alert(t.error, t.enterName);
       return;
     }
 
-    if (people.includes(name)) {
+    if (people.includes(cleanUsername)) {
       Alert.alert(t.error, t.personExists);
       return;
     }
 
-    const updatedPeople = [...people, name];
-
-    setPeople(updatedPeople);
-
     try {
-      const usersQuery = query(
-        collection(db, "usernames"),
-        where("username", "==", name),
-      );
+      const usernameRef = doc(db, "usernames", cleanUsername);
+      const usernameSnapshot = await getDoc(usernameRef);
 
-      const usersSnapshot = await getDocs(usersQuery);
+      const updatedPeople = [...people, cleanUsername];
 
-      if (!usersSnapshot.empty) {
-        const invitedUserId = usersSnapshot.docs[0].data().uid;
+      if (usernameSnapshot.exists()) {
+        const invitedUserId = usernameSnapshot.data().uid;
 
         await updateDoc(doc(db, "groups", groupId), {
           persons: updatedPeople,
           members: arrayUnion(invitedUserId),
+          memberUsernames: arrayUnion(cleanUsername),
         });
       } else {
         await updateDoc(doc(db, "groups", groupId), {
           persons: updatedPeople,
         });
       }
+
+      setPeople(updatedPeople);
+
+      if (!paidBy) setPaidBy(cleanUsername);
+
+      setShares({
+        ...shares,
+        [cleanUsername]: "",
+      });
+
+      setPersonName("");
     } catch (error) {
       console.log("Fehler beim Hinzufügen:", error);
       Alert.alert("Fehler", "Person konnte nicht gespeichert werden.");
-      return;
     }
-
-    if (!paidBy) setPaidBy(name);
-
-    setShares({
-      ...shares,
-      [name]: "",
-    });
-
-    setPersonName("");
   }
 
   function deletePerson(name: string) {
