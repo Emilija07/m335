@@ -14,6 +14,7 @@ type Expense = {
 export default function ResultScreen() {
   const params = useLocalSearchParams();
   const [theme, setTheme] = useState("light");
+  const [currency, setCurrency] = useState("CHF");
 
   useFocusEffect(
     useCallback(() => {
@@ -22,8 +23,21 @@ export default function ResultScreen() {
   );
 
   async function loadTheme() {
-    const savedTheme = await AsyncStorage.getItem("theme");
-    if (savedTheme) setTheme(savedTheme);
+    const savedTheme =
+      await AsyncStorage.getItem(
+        "theme"
+      );
+
+    const savedCurrency =
+      await AsyncStorage.getItem(
+        "currency"
+      );
+
+    if (savedTheme)
+      setTheme(savedTheme);
+
+    if (savedCurrency)
+      setCurrency(savedCurrency);
   }
 
   const isDark = theme === "dark";
@@ -81,7 +95,7 @@ export default function ResultScreen() {
     const amount = Math.min(creditor.amount, debtor.amount);
 
     settlements.push(
-      `${debtor.name} schuldet ${creditor.name} ${amount.toFixed(2)} CHF`
+      `${debtor.name} schuldet ${creditor.name} ${amount.toFixed(2)} ${currency}`
     );
 
     creditor.amount -= amount;
@@ -118,7 +132,7 @@ export default function ResultScreen() {
         </Text>
 
         <Text style={[styles.summaryValue, isDark && styles.darkSummaryValue]}>
-          {total.toFixed(2)} CHF
+          {total.toFixed(2)} {currency}
         </Text>
       </View>
 
@@ -141,17 +155,17 @@ export default function ResultScreen() {
               </Text>
 
               <Text style={[styles.personDetail, isDark && styles.darkSubtitle]}>
-                Bezahlt: {paidTotals[person].toFixed(2)} CHF
+                Bezahlt: {paidTotals[person].toFixed(2)} {currency}
               </Text>
 
               <Text style={[styles.personDetail, isDark && styles.darkSubtitle]}>
-                Konsumiert: {consumedTotals[person].toFixed(2)} CHF
+                Konsumiert: {consumedTotals[person].toFixed(2)} {currency}
               </Text>
             </View>
 
             <Text style={balances[person] >= 0 ? styles.positive : styles.negative}>
               {balances[person] >= 0 ? "+" : ""}
-              {balances[person].toFixed(2)}
+              {balances[person].toFixed(2)} {currency}
             </Text>
           </View>
         ))}

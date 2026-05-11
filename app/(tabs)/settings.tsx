@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Location from "expo-location";
 import { router, useFocusEffect } from "expo-router";
 import {
   EmailAuthProvider,
@@ -30,6 +31,9 @@ const handleLogout = async () => {
 
 const translations = {
   de: {
+    currency: "Währung",
+    automatic: "Automatisch",
+    manual: "Manuell",
     settings: "Einstellungen",
     customize: "App anpassen",
     subtitle: "Passe Darstellung und Sprache von QuickSplit an.",
@@ -72,6 +76,10 @@ const translations = {
   },
 
   en: {
+
+    currency: "Currency",
+    automatic: "Automatic",
+    manual: "Manual",
     settings: "Settings",
     customize: "Customize app",
     subtitle:
@@ -125,6 +133,14 @@ export default function SettingsScreen() {
   const [language, setLanguage] =
     useState<"de" | "en">("de");
 
+  const [currency, setCurrency] =
+    useState("CHF");
+
+  const [currencyMode, setCurrencyMode] =
+    useState<"manual" | "auto">(
+      "manual"
+    );
+
   const [isGuest, setIsGuest] = useState(false);
 
   const [userData, setUserData] =
@@ -164,8 +180,29 @@ export default function SettingsScreen() {
     const savedLanguage =
       await AsyncStorage.getItem("language");
 
+    const savedCurrency =
+      await AsyncStorage.getItem("currency");
+
+    const savedCurrencyMode =
+      await AsyncStorage.getItem(
+        "currencyMode"
+      );
+
     if (savedTheme) {
       setTheme(savedTheme);
+    }
+
+    if (savedCurrency) {
+      setCurrency(savedCurrency);
+    }
+
+    if (
+      savedCurrencyMode === "manual" ||
+      savedCurrencyMode === "auto"
+    ) {
+      setCurrencyMode(
+        savedCurrencyMode
+      );
     }
 
     if (
@@ -193,6 +230,77 @@ export default function SettingsScreen() {
     await AsyncStorage.setItem(
       "language",
       value
+    );
+  }
+
+  async function changeCurrency(
+    value: string
+  ) {
+    setCurrency(value);
+
+    await AsyncStorage.setItem(
+      "currency",
+      value
+    );
+  }
+
+  async function enableAutoCurrency() {
+    const permission =
+      await Location.requestForegroundPermissionsAsync();
+
+    if (
+      permission.status !== "granted"
+    ) {
+      return;
+    }
+
+    const location =
+      await Location.getCurrentPositionAsync(
+        {}
+      );
+
+    const reverse =
+      await Location.reverseGeocodeAsync({
+        latitude:
+          location.coords.latitude,
+        longitude:
+          location.coords.longitude,
+      });
+
+    const country =
+      reverse[0]?.isoCountryCode;
+
+    let detectedCurrency = "CHF";
+
+    if (country === "CH")
+      detectedCurrency = "CHF";
+
+    if (
+      country === "DE" ||
+      country === "FR" ||
+      country === "IT" ||
+      country === "AT"
+    ) {
+      detectedCurrency = "EUR";
+    }
+
+    if (country === "US")
+      detectedCurrency = "USD";
+
+    if (country === "GB")
+      detectedCurrency = "GBP";
+
+    setCurrencyMode("auto");
+    setCurrency(detectedCurrency);
+
+    await AsyncStorage.setItem(
+      "currencyMode",
+      "auto"
+    );
+
+    await AsyncStorage.setItem(
+      "currency",
+      detectedCurrency
     );
   }
 
@@ -457,6 +565,104 @@ export default function SettingsScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+      </View>
+
+      <View
+        style={[
+          styles.card,
+          isDark && styles.darkCard,
+        ]}
+      >
+        <Text
+          style={[
+            styles.cardTitle,
+            isDark && styles.darkTitle,
+          ]}
+        >
+          {t.currency}
+        </Text>
+
+        <View style={styles.optionRow}>
+          <TouchableOpacity
+            style={[
+              styles.optionButton,
+              currencyMode === "auto" &&
+                styles.optionButtonActive,
+            ]}
+            onPress={enableAutoCurrency}
+          >
+            <Text
+              style={[
+                styles.optionText,
+                currencyMode === "auto" &&
+                  styles.optionTextActive,
+              ]}
+            >
+              🌍 {t.automatic}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.optionButton,
+              currencyMode === "manual" &&
+                styles.optionButtonActive,
+            ]}
+            onPress={async () => {
+              setCurrencyMode("manual");
+
+              await AsyncStorage.setItem(
+                "currencyMode",
+                "manual"
+              );
+            }}
+          >
+            <Text
+              style={[
+                styles.optionText,
+                currencyMode === "manual" &&
+                  styles.optionTextActive,
+              ]}
+            >
+              💰 {t.manual}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {currencyMode === "manual" && (
+          <View
+            style={[
+              styles.optionRow,
+              { marginTop: 12 },
+            ]}
+          >
+            {["CHF", "EUR", "USD", "GBP"].map(
+              (item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={[
+                    styles.optionButton,
+                    currency === item &&
+                      styles.optionButtonActive,
+                  ]}
+                  onPress={() =>
+                    changeCurrency(item)
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      currency === item &&
+                        styles.optionTextActive,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )
+            )}
+          </View>
+        )}
       </View>
 
       {!isGuest && userData && (

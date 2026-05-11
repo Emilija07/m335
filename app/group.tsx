@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { loadGroup, saveGroup } from "../services/storageServices";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -12,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { loadGroup, saveGroup } from "../services/storageServices";
 
 type Expense = {
   id: string;
@@ -99,6 +99,7 @@ export default function GroupScreen() {
 
   const [theme, setTheme] = useState("light");
   const [language, setLanguage] = useState<"de" | "en">("de");
+  const [currency, setCurrency] = useState("CHF");
 
   const [personName, setPersonName] = useState("");
   const [people, setPeople] = useState<string[]>([]);
@@ -130,12 +131,16 @@ export default function GroupScreen() {
   async function loadTheme() {
     const savedTheme = await AsyncStorage.getItem("theme");
     const savedLanguage = await AsyncStorage.getItem("language");
+    const savedCurrency = await AsyncStorage.getItem("currency");
 
     if (savedTheme) setTheme(savedTheme);
+
+    if (savedCurrency) {setCurrency(savedCurrency);}
 
     if (savedLanguage === "de" || savedLanguage === "en") {
         setLanguage(savedLanguage);
     }
+    
 }
 
   async function loadData() {
@@ -281,7 +286,7 @@ export default function GroupScreen() {
     if (Math.abs(sharesTotal - amount) > 0.05) {
       Alert.alert(
         t.error,
-        `${t.sharesMustMatch} ${amount.toFixed(2)} CHF. ${t.currently} ${sharesTotal.toFixed(2)} CHF.`
+        `${t.sharesMustMatch} ${amount.toFixed(2)} {currency}. ${t.currently} ${sharesTotal.toFixed(2)} {currency}.`
       );
       return;
     }
@@ -361,7 +366,7 @@ export default function GroupScreen() {
         <Text style={styles.pageLabel}>{t.group}</Text>
         <Text style={[styles.title, isDark && styles.darkTitle]}>{groupName}</Text>
         <Text style={[styles.subtitle, isDark && styles.darkSubtitle]}>
-          {people.length} Personen · {expenses.length} Ausgaben · {total.toFixed(2)} CHF
+          {people.length} Personen · {expenses.length} Ausgaben · {total.toFixed(2)} {currency}
         </Text>
       </View>
 
@@ -495,7 +500,7 @@ export default function GroupScreen() {
             renderItem={({ item }) => (
               <View style={[styles.expenseRow, isDark && styles.darkSoftRow]}>
                 <View style={styles.expenseIcon}>
-                  <Text style={styles.expenseIconText}>CHF</Text>
+                  <Text style={styles.expenseIconText}>{currency}</Text>
                 </View>
 
                 <View style={styles.expenseInfo}>
@@ -503,7 +508,7 @@ export default function GroupScreen() {
                     {item.title}
                   </Text>
                   <Text style={[styles.expenseSubtitle, isDark && styles.darkSubtitle]}>
-                    {item.amount.toFixed(2)} CHF · {t.paidByShort} {item.paidBy}
+                    {item.amount.toFixed(2)} {currency} · {t.paidByShort} {item.paidBy}
                   </Text>
                 </View>
 
