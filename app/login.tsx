@@ -1,37 +1,62 @@
-import React, { useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router, useFocusEffect } from "expo-router";
 import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  Alert,
-  ActivityIndicator,
   View,
 } from "react-native";
-import { router } from "expo-router";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  onAuthStateChanged,
-  updateProfile,
-} from "firebase/auth";
-import { auth } from "../firebase";
 
 import { translation } from "../constants/translation";
-
-const language = "de"; // oder "en"
-const t = translation[language as "de" | "en"];
+import { auth } from "../firebase";
 
 export default function LoginScreen() {
+  const [theme, setTheme] = useState("light");
+  const [language, setLanguage] = useState<"de" | "en">("de");
+
   const [isRegister, setIsRegister] = useState(false);
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [buttonLoading, setButtonLoading] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadSettings();
+    }, [])
+  );
+
+  async function loadSettings() {
+    const savedTheme = await AsyncStorage.getItem("theme");
+    const savedLanguage = await AsyncStorage.getItem("language");
+
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+
+    if (savedLanguage === "de" || savedLanguage === "en") {
+      setLanguage(savedLanguage);
+    }
+  }
+
+  const isDark = theme === "dark";
+  const t = translation[language];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -51,19 +76,21 @@ export default function LoginScreen() {
 
   const getErrorMessage = (code?: string) => {
     if (code === "auth/invalid-email") {
-      return "Die E-Mail-Adresse ist ungültig.";
+      return language === "de"
+        ? "Die E-Mail-Adresse ist ungültig."
+        : "The email address is invalid.";
     }
 
     if (code === "auth/email-already-in-use") {
-      return "Diese E-Mail-Adresse ist bereits registriert.";
+      return language === "de"
+        ? "Diese E-Mail-Adresse ist bereits registriert."
+        : "This email address is already registered.";
     }
 
     if (code === "auth/weak-password") {
-      return "Das Passwort ist zu schwach. Es braucht mindestens 6 Zeichen.";
-    }
-
-    if (code === "auth/operation-not-allowed") {
-      return "Email/Password ist in Firebase nicht aktiviert. Aktiviere es unter Authentication → Sign-in method.";
+      return language === "de"
+        ? "Das Passwort muss mindestens 6 Zeichen haben."
+        : "Password must contain at least 6 characters.";
     }
 
     if (
@@ -71,14 +98,20 @@ export default function LoginScreen() {
       code === "auth/wrong-password" ||
       code === "auth/user-not-found"
     ) {
-      return "E-Mail oder Passwort ist falsch.";
+      return language === "de"
+        ? "E-Mail oder Passwort ist falsch."
+        : "Email or password is incorrect.";
     }
 
     if (code === "auth/network-request-failed") {
-      return "Netzwerkfehler. Prüfe deine Internetverbindung.";
+      return language === "de"
+        ? "Netzwerkfehler. Prüfe deine Verbindung."
+        : "Network error. Check your connection.";
     }
 
-    return "Ein unbekannter Fehler ist aufgetreten.";
+    return language === "de"
+      ? "Ein unbekannter Fehler ist aufgetreten."
+      : "An unknown error occurred.";
   };
 
   const handleSubmit = async () => {
@@ -87,17 +120,32 @@ export default function LoginScreen() {
     const cleanLastName = lastName.trim();
 
     if (!cleanEmail || !password) {
-      Alert.alert("Fehler", "Bitte E-Mail und Passwort eingeben.");
+      Alert.alert(
+        language === "de" ? "Fehler" : "Error",
+        language === "de"
+          ? "Bitte E-Mail und Passwort eingeben."
+          : "Please enter email and password."
+      );
       return;
     }
 
     if (isRegister && (!cleanFirstName || !cleanLastName)) {
-      Alert.alert("Fehler", "Bitte Vorname und Nachname eingeben.");
+      Alert.alert(
+        language === "de" ? "Fehler" : "Error",
+        language === "de"
+          ? "Bitte Vorname und Nachname eingeben."
+          : "Please enter first and last name."
+      );
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert("Fehler", "Das Passwort muss mindestens 6 Zeichen haben.");
+      Alert.alert(
+        language === "de" ? "Fehler" : "Error",
+        language === "de"
+          ? "Das Passwort muss mindestens 6 Zeichen haben."
+          : "Password must contain at least 6 characters."
+      );
       return;
     }
 
@@ -116,21 +164,26 @@ export default function LoginScreen() {
         });
 
         Alert.alert(
-          "Registrierung erfolgreich",
-          "Dein Konto wurde erstellt."
+          language === "de"
+            ? "Registrierung erfolgreich"
+            : "Registration successful",
+          language === "de"
+            ? "Dein Konto wurde erstellt."
+            : "Your account has been created."
         );
 
         router.replace("/(tabs)/groups");
       } else {
         await signInWithEmailAndPassword(auth, cleanEmail, password);
+
         router.replace("/(tabs)/groups");
       }
     } catch (error: any) {
       console.log("Firebase Fehler:", error.code, error.message);
 
       Alert.alert(
-        "Fehler",
-        `${getErrorMessage(error.code)}\n\nCode: ${error.code ?? "unbekannt"}`
+        language === "de" ? "Fehler" : "Error",
+        getErrorMessage(error.code)
       );
     } finally {
       setButtonLoading(false);
@@ -140,37 +193,43 @@ export default function LoginScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#1F8F3A" />
+      <SafeAreaView
+        style={[styles.container, isDark && styles.darkContainer]}
+      >
+        <ActivityIndicator size="large" color="#16A34A" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.logo}>QuickSplit</Text>
+    <SafeAreaView
+      style={[styles.container, isDark && styles.darkContainer]}
+    >
+      <Text style={styles.logo}>💸 QuickSplit</Text>
 
-      <Text style={styles.subtitle}>{t.subtitle}</Text>
+      <Text style={[styles.subtitle, isDark && styles.darkSubtitle]}>
+        {t.subtitle}
+      </Text>
 
-      <View style={styles.card}>
-        <Text style={styles.title}>
+      <View style={[styles.card, isDark && styles.darkCard]}>
+        <Text style={[styles.title, isDark && styles.darkTitle]}>
           {isRegister ? t.signUp : t.signIn}
         </Text>
 
         {isRegister && (
           <>
             <TextInput
-              style={styles.input}
+              style={[styles.input, isDark && styles.darkInput]}
               placeholder={t.firstName}
-              placeholderTextColor="#888"
+              placeholderTextColor="#94A3B8"
               value={firstName}
               onChangeText={setFirstName}
             />
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, isDark && styles.darkInput]}
               placeholder={t.lastName}
-              placeholderTextColor="#888"
+              placeholderTextColor="#94A3B8"
               value={lastName}
               onChangeText={setLastName}
             />
@@ -178,9 +237,9 @@ export default function LoginScreen() {
         )}
 
         <TextInput
-          style={styles.input}
+          style={[styles.input, isDark && styles.darkInput]}
           placeholder={t.email}
-          placeholderTextColor="#888"
+          placeholderTextColor="#94A3B8"
           keyboardType="email-address"
           autoCapitalize="none"
           value={email}
@@ -188,9 +247,9 @@ export default function LoginScreen() {
         />
 
         <TextInput
-          style={styles.input}
+          style={[styles.input, isDark && styles.darkInput]}
           placeholder={t.password}
-          placeholderTextColor="#888"
+          placeholderTextColor="#94A3B8"
           secureTextEntry
           value={password}
           onChangeText={setPassword}
@@ -202,7 +261,7 @@ export default function LoginScreen() {
           disabled={buttonLoading}
         >
           {buttonLoading ? (
-            <ActivityIndicator color="#FFF" />
+            <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text style={styles.primaryButtonText}>
               {isRegister ? t.createAccount : t.signIn}
@@ -234,81 +293,123 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F6F8F6",
+    backgroundColor: "#F8FAFC",
     justifyContent: "center",
     padding: 24,
   },
-  logo: {
-    fontSize: 36,
-    fontWeight: "bold",
-    color: "#1F8F3A",
-    textAlign: "center",
-    marginBottom: 8,
+
+  darkContainer: {
+    backgroundColor: "#0F172A",
   },
+
+  logo: {
+    fontSize: 38,
+    fontWeight: "900",
+    color: "#16A34A",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+
   subtitle: {
     fontSize: 16,
-    color: "#555",
+    color: "#64748B",
     textAlign: "center",
-    marginBottom: 32,
+    marginBottom: 30,
+    lineHeight: 24,
   },
+
+  darkSubtitle: {
+    color: "#CBD5E1",
+  },
+
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    borderRadius: 28,
     padding: 24,
-    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    elevation: 6,
   },
+
+  darkCard: {
+    backgroundColor: "#1E293B",
+  },
+
   title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-    color: "#222",
+    fontSize: 28,
+    fontWeight: "900",
+    marginBottom: 22,
+    color: "#0F172A",
     textAlign: "center",
   },
+
+  darkTitle: {
+    color: "#FFFFFF",
+  },
+
   input: {
-    height: 52,
+    height: 56,
     borderWidth: 1,
-    borderColor: "#DDD",
-    borderRadius: 12,
-    paddingHorizontal: 14,
+    borderColor: "#E2E8F0",
+    borderRadius: 16,
+    paddingHorizontal: 16,
     marginBottom: 14,
     fontSize: 16,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F8FAFC",
+    color: "#0F172A",
   },
+
+  darkInput: {
+    backgroundColor: "#334155",
+    borderColor: "#475569",
+    color: "#FFFFFF",
+  },
+
   primaryButton: {
-    height: 52,
-    backgroundColor: "#1F8F3A",
-    borderRadius: 12,
+    height: 56,
+    backgroundColor: "#16A34A",
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 10,
   },
+
   primaryButtonText: {
-    color: "#FFF",
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "800",
   },
+
   switchText: {
-    color: "#1F8F3A",
+    color: "#16A34A",
     textAlign: "center",
-    marginTop: 16,
-    fontSize: 15,
+    marginTop: 18,
+    fontWeight: "700",
   },
+
   divider: {
     height: 1,
-    backgroundColor: "#EEE",
-    marginVertical: 20,
+    backgroundColor: "#E2E8F0",
+    marginVertical: 22,
   },
+
   guestButton: {
-    height: 50,
-    borderWidth: 1,
-    borderColor: "#1F8F3A",
-    borderRadius: 12,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#16A34A",
     justifyContent: "center",
     alignItems: "center",
   },
+
   guestButtonText: {
-    color: "#1F8F3A",
+    color: "#16A34A",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "800",
   },
 });

@@ -1,18 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { signOut } from "firebase/auth";
-import { router } from "expo-router";
 import { auth } from "../../firebase";
-import { translation } from "../../constants/translation";
-
-const language = "de"; // oder "en"
-const t = translation[language as "de" | "en"];
 
 const handleLogout = async () => {
   await signOut(auth);
-  router.replace("/login");
+  router.replace("../login");
 };
 
 const translations = {
@@ -26,10 +21,13 @@ const translations = {
     language: "Sprache",
     german: "Deutsch",
     english: "English",
+    login: "Anmeldung",
+    logout: "Ausloggen",
     features: "Weitere mögliche Features",
     featureList:
       "• Währung auswählen: CHF, EUR, USD\n• Daten zurücksetzen\n• Export als PDF oder Screenshot\n• Standard-Sprache speichern\n• App-Version anzeigen",
   },
+
   en: {
     settings: "Settings",
     customize: "Customize app",
@@ -40,6 +38,8 @@ const translations = {
     language: "Language",
     german: "German",
     english: "English",
+    login: "Login",
+    logout: "Logout",
     features: "Possible future features",
     featureList:
       "• Select currency: CHF, EUR, USD\n• Reset data\n• Export as PDF or screenshot\n• Save default language\n• Show app version",
@@ -49,12 +49,21 @@ const translations = {
 export default function SettingsScreen() {
   const [theme, setTheme] = useState("light");
   const [language, setLanguage] = useState<"de" | "en">("de");
+  const [isGuest, setIsGuest] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       loadSettings();
     }, [])
   );
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsGuest(!user);
+    });
+
+    return unsubscribe;
+  }, []);
 
   async function loadSettings() {
     const savedTheme = await AsyncStorage.getItem("theme");
@@ -179,13 +188,26 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.logoutContainer}>
-  <TouchableOpacity
-    style={styles.logoutButton}
-    onPress={handleLogout}
-  >
-    <Text style={styles.logoutText}>Ausloggen</Text>
-  </TouchableOpacity>
-</View>
+        {isGuest ? (
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={() => router.replace("/login")}
+          >
+            <Text style={styles.logoutText}>
+              {t.login}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={handleLogout}
+          >
+            <Text style={styles.logoutText}>
+              {t.logout}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       <View style={[styles.infoCard, isDark && styles.darkInfoCard]}>
         <Text style={[styles.infoTitle, isDark && styles.darkTitle]}>
@@ -207,9 +229,11 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingTop: 64,
   },
+
   darkContainer: {
     backgroundColor: "#0F172A",
   },
+
   pageLabel: {
     color: "#16A34A",
     fontSize: 14,
@@ -217,17 +241,21 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 6,
   },
+
   darkGreenText: {
     color: "#22C55E",
   },
+
   title: {
     fontSize: 34,
     fontWeight: "900",
     color: "#0F172A",
   },
+
   darkTitle: {
     color: "#FFFFFF",
   },
+
   subtitle: {
     color: "#64748B",
     fontSize: 15,
@@ -235,9 +263,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 24,
   },
+
   darkSubtitle: {
     color: "#CBD5E1",
   },
+
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
@@ -249,19 +279,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     elevation: 3,
   },
+
   darkCard: {
     backgroundColor: "#1E293B",
   },
+
   cardTitle: {
     color: "#0F172A",
     fontSize: 20,
     fontWeight: "800",
     marginBottom: 14,
   },
+
   optionRow: {
     flexDirection: "row",
     gap: 10,
   },
+
   optionButton: {
     flex: 1,
     backgroundColor: "#F1F5F9",
@@ -269,49 +303,59 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
   },
+
   optionButtonActive: {
     backgroundColor: "#16A34A",
   },
+
   optionText: {
     color: "#334155",
     fontWeight: "800",
   },
+
   optionTextActive: {
     color: "#FFFFFF",
   },
+
+  logoutContainer: {
+    marginTop: 10,
+    marginBottom: 18,
+  },
+
+  logoutButton: {
+    backgroundColor: "#DC2626",
+    borderRadius: 18,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+
+  logoutText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+
   infoCard: {
     backgroundColor: "#ECFDF5",
     borderRadius: 22,
     padding: 18,
     marginTop: 6,
   },
+
   darkInfoCard: {
     backgroundColor: "#064E3B",
   },
+
   infoTitle: {
     color: "#065F46",
     fontSize: 17,
     fontWeight: "900",
-    marginBottom: 8,
+    marginBottom: 4,
   },
+
   infoText: {
     color: "#047857",
     fontSize: 14,
     lineHeight: 22,
   },
-logoutContainer: {
-  marginTop: 30,
-  paddingHorizontal: 20,
-},
-logoutButton: {
-  backgroundColor: "#D9534F",
-  paddingVertical: 14,
-  borderRadius: 12,
-  alignItems: "center",
-},
-logoutText: {
-  color: "#FFFFFF",
-  fontSize: 16,
-  fontWeight: "bold",
-},
 });

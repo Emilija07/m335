@@ -5,5 +5,5 @@ const language = "de"; // oder "en"
 const t = translation[language];
 
 export default function Index() {
-  return <Redirect href="/login" />;
+  return <Redirect href="./login" />;
 }
