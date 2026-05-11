@@ -91,7 +91,7 @@ export async function saveGroup(group: Group) {
 
   const groupToSave: Group = {
     ...group,
-    ownerId: user.uid,
+    ownerId: group.ownerId ?? user.uid,
     members: group.members ?? [user.uid],
     memberUsernames: group.memberUsernames ?? [user.displayName || "unknown"],
   };

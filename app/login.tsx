@@ -18,9 +18,9 @@ import {
   View,
 } from "react-native";
 
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { translation } from "../constants/translation";
 import { auth, db } from "../firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
 
 export default function LoginScreen() {
   const [theme, setTheme] = useState("light");
@@ -41,7 +41,7 @@ export default function LoginScreen() {
   useFocusEffect(
     useCallback(() => {
       loadSettings();
-    }, [])
+    }, []),
   );
 
   async function loadSettings() {
@@ -127,7 +127,7 @@ export default function LoginScreen() {
         language === "de" ? "Fehler" : "Error",
         language === "de"
           ? "Bitte E-Mail und Passwort eingeben."
-          : "Please enter email and password."
+          : "Please enter email and password.",
       );
       return;
     }
@@ -137,7 +137,7 @@ export default function LoginScreen() {
         language === "de" ? "Fehler" : "Error",
         language === "de"
           ? "Bitte Vorname und Nachname eingeben."
-          : "Please enter first and last name."
+          : "Please enter first and last name.",
       );
       return;
     }
@@ -147,7 +147,7 @@ export default function LoginScreen() {
         language === "de" ? "Fehler" : "Error",
         language === "de"
           ? "Bitte Benutzernamen eingeben."
-          : "Please enter a username."
+          : "Please enter a username.",
       );
       return;
     }
@@ -157,7 +157,7 @@ export default function LoginScreen() {
         language === "de" ? "Fehler" : "Error",
         language === "de"
           ? "Das Passwort muss mindestens 6 Zeichen haben."
-          : "Password must contain at least 6 characters."
+          : "Password must contain at least 6 characters.",
       );
       return;
     }
@@ -166,24 +166,23 @@ export default function LoginScreen() {
       setButtonLoading(true);
 
       if (isRegister) {
-
         const usernameRef = doc(db, "usernames", cleanUsername);
-const usernameSnapshot = await getDoc(usernameRef);
+        const usernameSnapshot = await getDoc(usernameRef);
 
-if (usernameSnapshot.exists()) {
-  Alert.alert(
-    language === "de" ? "Fehler" : "Error",
-    language === "de"
-      ? "Dieser Benutzername ist bereits vergeben."
-      : "This username is already taken."
-  );
-  setButtonLoading(false);
-  return;
-}
+        if (usernameSnapshot.exists()) {
+          Alert.alert(
+            language === "de" ? "Fehler" : "Error",
+            language === "de"
+              ? "Dieser Benutzername ist bereits vergeben."
+              : "This username is already taken.",
+          );
+          setButtonLoading(false);
+          return;
+        }
         const userCredential = await createUserWithEmailAndPassword(
           auth,
           cleanEmail,
-          password
+          password,
         );
 
         await updateProfile(userCredential.user, {
@@ -191,12 +190,12 @@ if (usernameSnapshot.exists()) {
         });
 
         await setDoc(doc(db, "usernames", cleanUsername), {
-  uid: userCredential.user.uid,
-  username: cleanUsername,
-  firstName: cleanFirstName,
-  lastName: cleanLastName,
-  email: cleanEmail,
-});
+          uid: userCredential.user.uid,
+          username: cleanUsername,
+          firstName: cleanFirstName,
+          lastName: cleanLastName,
+          email: cleanEmail,
+        });
 
         Alert.alert(
           language === "de"
@@ -204,7 +203,7 @@ if (usernameSnapshot.exists()) {
             : "Registration successful",
           language === "de"
             ? "Dein Konto wurde erstellt."
-            : "Your account has been created."
+            : "Your account has been created.",
         );
 
         router.replace("/(tabs)/groups");
@@ -218,7 +217,7 @@ if (usernameSnapshot.exists()) {
 
       Alert.alert(
         language === "de" ? "Fehler" : "Error",
-        getErrorMessage(error.code)
+        getErrorMessage(error.code),
       );
     } finally {
       setButtonLoading(false);
@@ -228,18 +227,14 @@ if (usernameSnapshot.exists()) {
 
   if (loading) {
     return (
-      <SafeAreaView
-        style={[styles.container, isDark && styles.darkContainer]}
-      >
+      <SafeAreaView style={[styles.container, isDark && styles.darkContainer]}>
         <ActivityIndicator size="large" color="#16A34A" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, isDark && styles.darkContainer]}
-    >
+    <SafeAreaView style={[styles.container, isDark && styles.darkContainer]}>
       <Text style={styles.logo}>💸 QuickSplit</Text>
 
       <Text style={[styles.subtitle, isDark && styles.darkSubtitle]}>
@@ -321,13 +316,8 @@ if (usernameSnapshot.exists()) {
 
         <View style={styles.divider} />
 
-        <TouchableOpacity
-          style={styles.guestButton}
-          onPress={continueAsGuest}
-        >
-          <Text style={styles.guestButtonText}>
-            {t.continueAsGuest}
-          </Text>
+        <TouchableOpacity style={styles.guestButton} onPress={continueAsGuest}>
+          <Text style={styles.guestButtonText}>{t.continueAsGuest}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

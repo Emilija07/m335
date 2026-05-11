@@ -1,5 +1,9 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getApp, getApps, initializeApp } from "firebase/app";
+import {
+  browserSessionPersistence,
+  getAuth,
+  setPersistence,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -14,4 +18,13 @@ const firebaseConfig = {
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
+
+// Auf Web bleibt der Login nur im aktuellen Tab/Fenster.
+// Dadurch kannst du in mehreren Tabs unterschiedliche Accounts verwenden.
+if (typeof window !== "undefined") {
+  setPersistence(auth, browserSessionPersistence).catch((error) => {
+    console.log("Persistence konnte nicht gesetzt werden:", error);
+  });
+}
+
 export const db = getFirestore(app);
