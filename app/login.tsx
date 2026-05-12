@@ -72,7 +72,8 @@ export default function LoginScreen() {
     return unsubscribe;
   }, []);
 
-  const continueAsGuest = () => {
+  const continueAsGuest = async () => {
+    await AsyncStorage.setItem("guestMode", "true");
     router.replace("/(tabs)/groups");
   };
 

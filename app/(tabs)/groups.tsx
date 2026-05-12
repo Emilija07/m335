@@ -9,7 +9,7 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -64,13 +64,10 @@ export default function GroupsScreen() {
   const [theme, setTheme] = useState("light");
   const [language, setLanguage] = useState<"de" | "en">("de");
 
-  useEffect(() => {
-    loadGroups();
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
       loadSettings();
+      loadGroups();
     }, []),
   );
 
@@ -86,10 +83,12 @@ export default function GroupsScreen() {
   }
 
   async function loadGroups() {
+    const guestMode = await AsyncStorage.getItem("guestMode");
     const user = auth.currentUser;
 
-    if (!user) {
-      setGroups([]);
+    if (guestMode === "true" || !user) {
+      const savedGroups = await AsyncStorage.getItem("guestGroups");
+      setGroups(savedGroups ? JSON.parse(savedGroups) : []);
       return;
     }
 
@@ -108,9 +107,6 @@ export default function GroupsScreen() {
         name: item.name,
         persons: item.persons || [],
         expenses: item.expenses || [],
-        members: item.members || [],
-        memberUsernames: item.memberUsernames || [],
-        ownerId: item.ownerId,
       };
     });
 
@@ -118,32 +114,65 @@ export default function GroupsScreen() {
   }
 
   async function addGroup() {
-    const name = groupName.trim();
+    try {
+      const name = groupName.trim();
 
-    if (!name) {
-      Alert.alert(t.errorTitle, t.errorGroupName);
-      return;
+      if (!name) {
+        Alert.alert(t.errorTitle, t.errorGroupName);
+        return;
+      }
+
+      const guestMode = await AsyncStorage.getItem("guestMode");
+      const user = auth.currentUser;
+
+      if (guestMode === "true" || !user) {
+        const savedGroups = await AsyncStorage.getItem("guestGroups");
+        const oldGroups = savedGroups ? JSON.parse(savedGroups) : [];
+
+        const newGroup = {
+          id: Date.now().toString(),
+          name,
+          persons: [],
+          expenses: [],
+        };
+
+        const updatedGroups = [...oldGroups, newGroup];
+
+        await AsyncStorage.setItem(
+          "guestGroups",
+          JSON.stringify(updatedGroups),
+        );
+        setGroups(updatedGroups);
+        setGroupName("");
+
+        return;
+      }
+
+      await addDoc(collection(db, "groups"), {
+        name,
+        members: [user.uid],
+        persons: [],
+        expenses: [],
+      });
+
+      setGroupName("");
+      await loadGroups();
+    } catch (error) {
+      console.log("Fehler beim Gruppe erstellen:", error);
+      Alert.alert("Fehler", "Gruppe konnte nicht erstellt werden.");
     }
-
-    const user = auth.currentUser;
-
-    if (!user) {
-      Alert.alert("Fehler", "Du musst angemeldet sein.");
-      return;
-    }
-
-    await addDoc(collection(db, "groups"), {
-      name,
-      members: [user.uid],
-      persons: [],
-      expenses: [],
-    });
-
-    await loadGroups();
-    setGroupName("");
   }
 
   async function deleteGroup(id: string) {
+    const user = auth.currentUser;
+
+    if (!user) {
+      const updatedGroups = groups.filter((group) => group.id !== id);
+      setGroups(updatedGroups);
+      await AsyncStorage.setItem("guestGroups", JSON.stringify(updatedGroups));
+      return;
+    }
+
     await deleteDoc(doc(db, "groups", id));
     await loadGroups();
   }
@@ -213,6 +242,7 @@ export default function GroupsScreen() {
                 params: {
                   groupId: item.id,
                   groupName: item.name,
+                  isGuest: "true",
                 },
               } as any)
             }
@@ -236,7 +266,10 @@ export default function GroupsScreen() {
 
             <TouchableOpacity
               style={styles.deleteButton}
-              onPress={() => deleteGroup(item.id)}
+              onPress={(event) => {
+                event.stopPropagation();
+                deleteGroup(item.id);
+              }}
             >
               <Text style={styles.deleteText}>×</Text>
             </TouchableOpacity>

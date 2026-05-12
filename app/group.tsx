@@ -1,11 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import {
-  arrayUnion,
-  doc,
-  getDoc,
-  updateDoc
-} from "firebase/firestore";
+import { arrayUnion, doc, getDoc, updateDoc } from "firebase/firestore";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -104,6 +99,7 @@ export default function GroupScreen() {
   const params = useLocalSearchParams();
   const groupId = params.groupId as string;
   const groupName = (params.groupName as string) || "Gruppe";
+  const isGuest = params.isGuest === "true";
 
   const [theme, setTheme] = useState("light");
   const [language, setLanguage] = useState<"de" | "en">("de");
@@ -154,6 +150,25 @@ export default function GroupScreen() {
 
   async function loadData() {
     try {
+      if (isGuest) {
+        const savedGroups = await AsyncStorage.getItem("guestGroups");
+        const guestGroups = savedGroups ? JSON.parse(savedGroups) : [];
+
+        const group = guestGroups.find((g: any) => g.id === groupId);
+
+        if (group) {
+          setPeople(group.persons || []);
+          setExpenses(group.expenses || []);
+
+          if (group.persons?.length > 0) {
+            setPaidBy(group.persons[0]);
+          }
+        }
+
+        setDataLoaded(true);
+        return;
+      }
+
       const groupRef = doc(db, "groups", groupId);
       const snapshot = await getDoc(groupRef);
 
@@ -167,7 +182,7 @@ export default function GroupScreen() {
       setPeople(group.persons || []);
       setExpenses(group.expenses || []);
 
-      if (group.persons && group.persons.length > 0) {
+      if (group.persons?.length > 0) {
         setPaidBy(group.persons[0]);
       }
 
@@ -180,6 +195,23 @@ export default function GroupScreen() {
 
   async function saveData(updatedPeople = people, updatedExpenses = expenses) {
     try {
+      if (isGuest) {
+        const savedGroups = await AsyncStorage.getItem("guestGroups");
+        const guestGroups = savedGroups ? JSON.parse(savedGroups) : [];
+
+        const updatedGroups = guestGroups.map((group: any) =>
+          group.id === groupId
+            ? { ...group, persons: updatedPeople, expenses: updatedExpenses }
+            : group,
+        );
+
+        await AsyncStorage.setItem(
+          "guestGroups",
+          JSON.stringify(updatedGroups),
+        );
+        return;
+      }
+
       const groupRef = doc(db, "groups", groupId);
 
       await updateDoc(groupRef, {
@@ -200,6 +232,22 @@ export default function GroupScreen() {
 
     if (people.includes(cleanUsername)) {
       Alert.alert(t.error, t.personExists);
+      return;
+    }
+    if (isGuest) {
+      const updatedPeople = [...people, cleanUsername];
+
+      setPeople(updatedPeople);
+
+      if (!paidBy) setPaidBy(cleanUsername);
+
+      setShares({
+        ...shares,
+        [cleanUsername]: "",
+      });
+
+      setPersonName("");
+      await saveData(updatedPeople, expenses);
       return;
     }
 
